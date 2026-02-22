@@ -110,6 +110,31 @@ async function initDB() {
 
 // ─── ROUTES ───────────────────────────────────────────────────────────────────
 
+// Raíz — confirma que el servidor está vivo (evita "Cannot GET /")
+app.get('/', (_, res) => {
+  res.send('API online ✅');
+});
+
+// Health check con ping real a DB — Railway lo usa para readiness
+app.get('/health', async (_, res) => {
+  const health = {
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    db: 'unknown',
+  };
+
+  try {
+    await pool.query('SELECT 1');
+    health.db = 'ok';
+    res.json(health);
+  } catch (err) {
+    health.status = 'degraded';
+    health.db = 'down';
+    health.db_error = err.message.slice(0, 120);
+    res.status(503).json(health);
+  }
+});
+
 app.get('/api/producciones', async (req, res) => {
   try {
     const result = await pool.query(
@@ -154,12 +179,9 @@ app.delete('/api/producciones/:id', async (req, res) => {
   }
 });
 
-// Health check — Railway lo usa para saber si el servicio está vivo
-app.get('/health', (_, res) => res.json({ status: 'ok' }));
-
 // ─── START ────────────────────────────────────────────────────────────────────
-// Railway inyecta PORT. Nunca hardcodear.
-const PORT = process.env.PORT || 3000;
+// Railway inyecta PORT. Nunca hardcodear. Default 8080 es el estándar Railway.
+const PORT = process.env.PORT || 8080;
 
 initDB()
   .then(() => {
